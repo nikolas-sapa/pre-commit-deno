@@ -63,7 +63,11 @@ def _resolve_deno_version(version: str) -> str:
     return version
 
 
-def _get_deno_url(version: str, os_name: str = None, arch: str = None) -> str:
+def _get_deno_url(
+        version: str,
+        os_name: str | None = None,
+        arch: str | None = None,
+) -> str:
     """Get the download URL for a specific Deno version and platform.
 
     Args:
@@ -107,16 +111,6 @@ def _install_deno_binary(version: str, dest: str) -> None:
     """Download and install Deno binary to the destination directory."""
     url = _get_deno_url(version)
 
-    try:
-        resp = urllib.request.urlopen(url)
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            raise ValueError(
-                f'Could not find Deno version {version} for your platform. '
-                f'Visit https://github.com/denoland/deno/releases for available versions.',
-            )
-        raise
-
     # Deno releases are all .zip format as of 2024
     archive_ext = '.zip'
     # Windows uses deno.exe, other platforms use 'deno'
@@ -124,8 +118,19 @@ def _install_deno_binary(version: str, dest: str) -> None:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         archive_path = os.path.join(tmpdir, f'deno{archive_ext}')
-        with open(archive_path, 'wb') as f:
-            shutil.copyfileobj(resp, f)
+        try:
+            with urllib.request.urlopen(url) as resp:
+                with open(archive_path, 'wb') as f:
+                    shutil.copyfileobj(resp, f)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                raise ValueError(
+                    f'Could not find Deno version {version} for your '
+                    f'platform. Visit '
+                    f'https://github.com/denoland/deno/releases for '
+                    f'available versions.',
+                )
+            raise
 
         # Extract zip archive
         with zipfile.ZipFile(archive_path, 'r') as archive:
